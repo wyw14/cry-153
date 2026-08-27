@@ -58,10 +58,11 @@ func (c *Client) send(ctx context.Context, payload []byte) error {
 	return fmt.Errorf("gateway status %d: %s", resp.StatusCode, string(body))
 }
 func WaitBackoff(ctx context.Context, attempt int, max time.Duration) error {
-	d := time.Second * time.Duration(1<<attempt)
-	if d > max || d < 0 {
-		d = max
-	}
+	// Reuse the single, overflow-safe backoff implementation so the close
+	// path cannot diverge from the rest of the package. A negative or
+	// overflowed duration here previously made time.NewTimer fire instantly,
+	// turning a stalled gateway into a thousands-per-second request storm.
+	d := BoundedBackoff(attempt, max)
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {
