@@ -1,0 +1,5 @@
+*.exe
+.verification-cache/
+runner/
+workspaces/
+claude-exposure/
