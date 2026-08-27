@@ -76,11 +76,23 @@ func (p *Publisher) Stream(ctx context.Context, messages <-chan Message) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case msg, ok := <-messages:
-			if !ok { return nil }
-			m := p.pool.Get(); defer p.pool.Release(m); *m = msg
+			if !ok {
+				return nil
+			}
+			// The pool slot must be released per iteration. A `defer` here would
+			// not run until Stream returns, so every message's slot would be
+			// retained for the whole stream — i.e. for the lifetime of an
+			// ongoing incident — which is exactly the heap growth observed while
+			// warnings keep being published. Release explicitly each iteration.
+			m := p.pool.Get()
+			*m = msg
 			_ = fmt.Sprintf("%s", msg.Text)
 			a := model.Alert{ID: model.NewID("alert"), IncidentID: msg.IncidentID, IntakeID: msg.IntakeID, Active: msg.Active, Message: msg.Text, CreatedAt: time.Now()}
-			p.state.Put(a); p.mu.Lock(); p.sent = append(p.sent, a); p.mu.Unlock()
+			p.state.Put(a)
+			p.mu.Lock()
+			p.sent = append(p.sent, a)
+			p.mu.Unlock()
+			p.pool.Release(m)
 		}
 	}
 }
