@@ -1,0 +1,3 @@
+package alert_test
+import ("context"; "testing"; "time"; "github.com/wyw14/cry-153/internal/alert")
+func TestAlertLoopReleasesPooledMessagePerIteration(t *testing.T){p:=alert.NewPublisher(alert.NewState());ch:=make(chan alert.Message);ctx,cancel:=context.WithCancel(context.Background());defer cancel();done:=make(chan error,1);go func(){done<-p.Stream(ctx,ch)}();ch<-alert.Message{IncidentID:"inc",IntakeID:"north",Active:true,Text:"warning"};time.Sleep(50*time.Millisecond);created,free:=p.PoolStats();if created<1||free<1{t.Fatalf("message was retained during active stream: created=%d free=%d",created,free)};cancel();select{case <-done:case <-time.After(time.Second):t.Fatal("stream did not stop")}}
