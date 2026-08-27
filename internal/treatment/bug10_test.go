@@ -1,0 +1,3 @@
+package treatment_test
+import ("testing"; "time"; "github.com/wyw14/cry-153/internal/model"; "github.com/wyw14/cry-153/internal/treatment")
+func TestTreatmentSimulationCannotSortLiveSampleWindow(t *testing.T){s:=treatment.NewState();c:=treatment.NewController(s);readings:=[]model.Reading{{StationID:"north",At:time.Unix(1,0),Concentration:2},{StationID:"north",At:time.Unix(2,0),Concentration:.2},{StationID:"north",At:time.Unix(3,0),Concentration:1}};before:=[]float64{2,.2,1};_=c.Simulate("inc",readings);for i,v:=range before{if readings[i].Concentration!=v{t.Fatalf("simulation reordered live samples: %#v",readings)}}}
