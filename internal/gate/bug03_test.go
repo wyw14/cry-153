@@ -1,0 +1,3 @@
+package gate_test
+import ("io"; "net/http"; "net/http/httptest"; "sync"; "testing"; "context"; "github.com/wyw14/cry-153/internal/gate")
+func TestGateRetryRebuildsCompleteRequestBody(t *testing.T){var mu sync.Mutex; bodies:=[]string{}; attempts:=0; srv:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){b,_:=io.ReadAll(r.Body);mu.Lock();bodies=append(bodies,string(b));attempts++;n:=attempts;mu.Unlock();if n==1{w.WriteHeader(502);return};w.WriteHeader(200)}));defer srv.Close(); c:=gate.NewClient(srv.URL,gate.NewCapacity(1));c.MaxRetries=1;c.MaxBackoff=0;if err:=c.Close(context.Background(),"north","incident-1");err!=nil{t.Fatal(err)};if len(bodies)!=2||bodies[0]==""||bodies[0]!=bodies[1]{t.Fatalf("retry payloads differ: %#v",bodies)}}
