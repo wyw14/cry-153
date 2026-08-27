@@ -26,10 +26,13 @@ func (c *Client) Close(ctx context.Context, intake, incident string) error {
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
+	// GetBody lets the transport re-issue the request on transient errors;
+	// each retry below also re-creates the body so a consumed stream isn't sent empty.
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(payload)), nil }
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
-		if attempt > 0 {
-			req.Body = http.NoBody
-		}
+		// Re-arm a fresh reader each attempt: the prior attempt already drained it.
+		req.Body = io.NopCloser(bytes.NewReader(payload))
 		if err := c.Capacity.Acquire(ctx); err != nil {
 			return err
 		}
