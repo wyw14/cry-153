@@ -60,7 +60,14 @@ func (s *Scheduler) Update(id string, priority int, deadline time.Time) {
 	}
 	t.Priority = priority
 	t.Deadline = deadline
-	if t.index >= 0 { s.queue[t.index] = t }
+	// Priority/Deadline are the heap keys. After mutating them the heap
+	// invariant at t.index is broken; heap.Fix sifts the element up or down
+	// to restore order. Without this the queue stays stale and Next() pops
+	// tasks in their pre-update positions (e.g. an escalated emergency
+	// resample stuck behind a routine inspection despite an earlier deadline).
+	if t.index >= 0 {
+		heap.Fix(&s.queue, t.index)
+	}
 }
 func (s *Scheduler) Next() (Task, bool) {
 	s.mu.Lock()
