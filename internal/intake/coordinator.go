@@ -17,11 +17,23 @@ type GateDriver interface {
 
 func NewCoordinator(l *Locks, g GateDriver) *Coordinator { return &Coordinator{locks: l, gate: g} }
 func (c *Coordinator) CloseGroup(ctx context.Context, incident string, ids []string) error {
-	ordered := append([]string(nil), ids...)
+	// Acquire per-intake locks in a globally consistent order (lexicographic)
+	// regardless of the caller-supplied ordering. Two concurrent CloseGroup calls
+	// that pass the same set of intakes in different orders (e.g. A=[north,south]
+	// and B=[south,north]) would otherwise deadlock: A holds north waiting for
+	// south while B holds south waiting for north, stalling both gate-close
+	// requests and the downstream alert publish permanently.
+	ordered := c.locks.Ordered(ids)
+	deferred := make([]string, 0, len(ordered))
+	defer func() {
+		for i := len(deferred) - 1; i >= 0; i-- {
+			c.locks.Unlock(deferred[i])
+		}
+	}()
 	for _, id := range ordered {
 		c.locks.Lock(id)
+		deferred = append(deferred, id)
 		time.Sleep(25 * time.Millisecond)
-		defer c.locks.Unlock(id)
 	}
 	for _, id := range ordered {
 		if err := c.gate.Close(ctx, id, incident); err != nil {
